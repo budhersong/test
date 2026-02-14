@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>네이버 플레이스 리뷰 분석기</title>
+  <link rel="stylesheet" href="/static/style.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+</head>
+<body>
+  <!-- ───── 헤더 ───── -->
+  <header class="header">
+    <div class="container">
+      <h1>네이버 플레이스 리뷰 분석기</h1>
+      <p class="subtitle">고객 리뷰 기반 경영 인사이트 도출 서비스</p>
+    </div>
+  </header>
+
+  <!-- ───── 검색 영역 ───── -->
+  <section class="search-section">
+    <div class="container">
+      <div class="search-box">
+        <input
+          type="text"
+          id="urlInput"
+          placeholder="네이버 플레이스 URL을 입력하세요 (예: https://m.place.naver.com/restaurant/1234567890)"
+        >
+        <button id="analyzeBtn" onclick="startAnalysis()">분석 시작</button>
+      </div>
+      <p class="search-hint">
+        지원 형식: m.place.naver.com, map.naver.com, pcmap.place.naver.com, naver.me 단축 URL, 장소 ID 직접 입력
+      </p>
+    </div>
+  </section>
+
+  <!-- ───── 로딩 ───── -->
+  <div id="loading" class="loading hidden">
+    <div class="spinner"></div>
+    <p>리뷰를 크롤링하고 분석하고 있습니다...</p>
+    <p class="loading-sub">네이버 플레이스에서 데이터를 수집 중입니다. 리뷰 수에 따라 최대 30초가 소요될 수 있습니다.</p>
+  </div>
+
+  <!-- ───── 에러 ───── -->
+  <div id="error" class="error-banner hidden">
+    <span id="errorMsg"></span>
+    <button onclick="document.getElementById('error').classList.add('hidden')">닫기</button>
+  </div>
+
+  <!-- ───── 결과 대시보드 ───── -->
+  <main id="dashboard" class="hidden">
+
+    <!-- 장소 정보 -->
+    <section class="place-info container">
+      <div class="place-header">
+        <div>
+          <h2 id="placeName"></h2>
+          <p id="placeCategory" class="place-meta"></p>
+          <p id="placeAddress" class="place-meta"></p>
+        </div>
+      </div>
+    </section>
+
+    <!-- KPI 카드 -->
+    <section class="kpi-section container">
+      <div class="kpi-grid">
+        <div class="kpi-card">
+          <span class="kpi-label">총 분석 리뷰</span>
+          <span class="kpi-value" id="kpiTotal">-</span>
+        </div>
+        <div class="kpi-card">
+          <span class="kpi-label">평균 별점</span>
+          <span class="kpi-value" id="kpiRating">-</span>
+        </div>
+        <div class="kpi-card positive">
+          <span class="kpi-label">긍정 비율</span>
+          <span class="kpi-value" id="kpiPositive">-</span>
+        </div>
+        <div class="kpi-card negative">
+          <span class="kpi-label">부정 비율</span>
+          <span class="kpi-value" id="kpiNegative">-</span>
+        </div>
+        <div class="kpi-card">
+          <span class="kpi-label">사장님 답글률</span>
+          <span class="kpi-value" id="kpiReply">-</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- 경영 인사이트 -->
+    <section class="insights-section container">
+      <h3>경영 인사이트 &amp; 개선사항</h3>
+      <div id="insightsList" class="insights-list"></div>
+    </section>
+
+    <!-- 차트 영역 -->
+    <section class="charts-section container">
+      <div class="chart-grid">
+        <div class="chart-card">
+          <h4>감성 분포</h4>
+          <canvas id="sentimentChart"></canvas>
+        </div>
+        <div class="chart-card">
+          <h4>별점 분포</h4>
+          <canvas id="ratingChart"></canvas>
+        </div>
+        <div class="chart-card">
+          <h4>카테고리별 평가</h4>
+          <canvas id="categoryChart"></canvas>
+        </div>
+        <div class="chart-card">
+          <h4>월별 감성 추이</h4>
+          <canvas id="trendChart"></canvas>
+        </div>
+      </div>
+    </section>
+
+    <!-- 키워드 -->
+    <section class="keywords-section container">
+      <div class="keyword-grid">
+        <div class="keyword-card">
+          <h4>긍정 키워드 TOP 15</h4>
+          <div id="positiveKeywords" class="keyword-list"></div>
+        </div>
+        <div class="keyword-card">
+          <h4>부정 키워드 TOP 15</h4>
+          <div id="negativeKeywords" class="keyword-list"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 리뷰 상세 테이블 -->
+    <section class="reviews-section container">
+      <h3>리뷰 상세 목록</h3>
+      <div class="filter-bar">
+        <button class="filter-btn active" data-filter="all" onclick="filterReviews('all', this)">전체</button>
+        <button class="filter-btn" data-filter="긍정" onclick="filterReviews('긍정', this)">긍정</button>
+        <button class="filter-btn" data-filter="부정" onclick="filterReviews('부정', this)">부정</button>
+        <button class="filter-btn" data-filter="중립" onclick="filterReviews('중립', this)">중립</button>
+      </div>
+      <div class="table-wrap">
+        <table id="reviewsTable">
+          <thead>
+            <tr>
+              <th>작성자</th>
+              <th>별점</th>
+              <th>감성</th>
+              <th>카테고리</th>
+              <th>리뷰 내용</th>
+              <th>작성일</th>
+            </tr>
+          </thead>
+          <tbody id="reviewsBody"></tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <!-- ───── 푸터 ───── -->
+  <footer class="footer">
+    <div class="container">
+      <p>네이버 플레이스 리뷰 분석기 &mdash; 경영 보조 도구</p>
+    </div>
+  </footer>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>
