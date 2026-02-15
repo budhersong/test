@@ -4,6 +4,7 @@
 네이버 플레이스 GraphQL API를 통해 리뷰를 크롤링합니다.
 """
 
+import asyncio
 import re
 import httpx
 
@@ -219,6 +220,25 @@ def _extract_redirect_url(html: str) -> str | None:
 # ──────────────────────────────────────────────
 
 
+async def _graphql_request(client: httpx.AsyncClient, payload: list) -> list:
+    """GraphQL 요청을 보내고, 429 응답 시 재시도합니다."""
+    for attempt in range(4):
+        resp = await client.post(
+            GRAPHQL_URL, json=payload, headers=GRAPHQL_HEADERS
+        )
+        if resp.status_code == 429:
+            wait = 2 ** attempt  # 1, 2, 4, 8초
+            await asyncio.sleep(wait)
+            continue
+        resp.raise_for_status()
+        return resp.json()
+    raise httpx.HTTPStatusError(
+        "429 Too Many Requests (재시도 초과)",
+        request=resp.request,
+        response=resp,
+    )
+
+
 async def fetch_place_info(place_id: str) -> dict:
     """장소 기본 정보를 조회합니다."""
     payload = [
@@ -229,11 +249,7 @@ async def fetch_place_info(place_id: str) -> dict:
         }
     ]
     async with httpx.AsyncClient(timeout=15) as client:
-        resp = await client.post(
-            GRAPHQL_URL, json=payload, headers=GRAPHQL_HEADERS
-        )
-        resp.raise_for_status()
-        data = resp.json()
+        data = await _graphql_request(client, payload)
 
     place = data[0].get("data", {}).get("place")
     if not place:
@@ -276,13 +292,14 @@ async def fetch_reviews(
             place_id, business_type, page_size, max_pages
         )
 
-    # 업종 타입을 모를 때: 주요 타입 순서대로 시도
-    for btype in ("restaurant", "cafe", "place", "hairshop", "hospital"):
+    # 업종 타입을 모를 때: 주요 타입 순서대로 시도 (딜레이 포함)
+    for btype in ("restaurant", "cafe", "place"):
         reviews = await _fetch_reviews_with_type(
             place_id, btype, page_size, max_pages
         )
         if reviews:
             return reviews
+        await asyncio.sleep(1)
 
     # 어떤 타입으로도 결과가 없으면 빈 리스트
     return []
@@ -323,13 +340,13 @@ async def _fetch_reviews_with_type(
             ]
 
             try:
-                resp = await client.post(
-                    GRAPHQL_URL, json=payload, headers=GRAPHQL_HEADERS
-                )
-                resp.raise_for_status()
-                data = resp.json()
+                data = await _graphql_request(client, payload)
             except (httpx.HTTPStatusError, httpx.RequestError):
                 break
+
+            # 페이지 간 딜레이
+            if page > 1:
+                await asyncio.sleep(0.5)
 
             visitor_reviews = (
                 data[0].get("data", {}).get("visitorReviews") or {}
@@ -384,5 +401,6 @@ async def crawl_place(url: str) -> dict:
     business_type = info["business_type"]
 
     place_info = await fetch_place_info(place_id)
+    await asyncio.sleep(1)
     reviews = await fetch_reviews(place_id, business_type)
     return {"place": place_info, "reviews": reviews}
