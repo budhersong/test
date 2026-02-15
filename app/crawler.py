@@ -52,21 +52,33 @@ query getPlaceInfo($input: PlaceInput) {
 }
 """
 
+_UA = (
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+    "AppleWebKit/537.36 (KHTML, like Gecko) "
+    "Chrome/131.0.0.0 Safari/537.36"
+)
+
 BROWSER_HEADERS = {
-    "User-Agent": (
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-        "AppleWebKit/537.36 (KHTML, like Gecko) "
-        "Chrome/131.0.0.0 Safari/537.36"
-    ),
+    "User-Agent": _UA,
     "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-    "Accept-Language": "ko-KR,ko;q=0.9,en;q=0.8",
+    "Accept-Language": "ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7",
 }
 
 GRAPHQL_HEADERS = {
+    "User-Agent": _UA,
     "Content-Type": "application/json",
-    "User-Agent": BROWSER_HEADERS["User-Agent"],
+    "Accept": "application/json, text/plain, */*",
+    "Accept-Language": "ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7",
     "Referer": "https://pcmap.place.naver.com/",
     "Origin": "https://pcmap.place.naver.com",
+    "Sec-Fetch-Dest": "empty",
+    "Sec-Fetch-Mode": "cors",
+    "Sec-Fetch-Site": "same-site",
+    "Sec-Ch-Ua": '"Chromium";v="131", "Not_A Brand";v="24"',
+    "Sec-Ch-Ua-Mobile": "?0",
+    "Sec-Ch-Ua-Platform": '"Windows"',
+    "DNT": "1",
+    "Connection": "keep-alive",
 }
 
 # 네이버 플레이스 URL에 등장하는 업종 경로 → GraphQL businessType 매핑
@@ -222,12 +234,12 @@ def _extract_redirect_url(html: str) -> str | None:
 
 async def _graphql_request(client: httpx.AsyncClient, payload: list) -> list:
     """GraphQL 요청을 보내고, 429 응답 시 재시도합니다."""
-    for attempt in range(4):
+    for attempt in range(5):
         resp = await client.post(
             GRAPHQL_URL, json=payload, headers=GRAPHQL_HEADERS
         )
         if resp.status_code == 429:
-            wait = 2 ** attempt  # 1, 2, 4, 8초
+            wait = 3 * (2 ** attempt)  # 3, 6, 12, 24, 48초
             await asyncio.sleep(wait)
             continue
         resp.raise_for_status()
@@ -345,8 +357,7 @@ async def _fetch_reviews_with_type(
                 break
 
             # 페이지 간 딜레이
-            if page > 1:
-                await asyncio.sleep(0.5)
+            await asyncio.sleep(1.5)
 
             visitor_reviews = (
                 data[0].get("data", {}).get("visitorReviews") or {}
@@ -401,6 +412,6 @@ async def crawl_place(url: str) -> dict:
     business_type = info["business_type"]
 
     place_info = await fetch_place_info(place_id)
-    await asyncio.sleep(1)
+    await asyncio.sleep(2)
     reviews = await fetch_reviews(place_id, business_type)
     return {"place": place_info, "reviews": reviews}
