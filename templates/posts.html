@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% block title %}수집 데이터 - 네이버 블로그 크롤러{% endblock %}
+{% block content %}
+
+<div class="page-header">
+  <h1>수집 데이터 <small>(총 {{ total }}건)</small></h1>
+</div>
+
+<section class="section">
+  <form method="get" action="/posts" class="search-form">
+    <input type="text" name="q" value="{{ q }}" placeholder="제목 또는 본문 검색..." class="form-input search-input">
+    <button type="submit" class="btn btn-primary">검색</button>
+    {% if q %}<a href="/posts" class="btn btn-secondary">초기화</a>{% endif %}
+  </form>
+</section>
+
+{% if posts %}
+<table class="table table-posts">
+  <thead>
+    <tr>
+      <th>수집일시</th>
+      <th>유형</th>
+      <th>키워드/채널</th>
+      <th>제목</th>
+      <th>작성자</th>
+      <th>작성일</th>
+      <th>Sheets</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for post in posts %}
+    <tr>
+      <td>{{ post.crawled_at.strftime('%Y-%m-%d %H:%M') }}</td>
+      <td><span class="badge badge-{{ post.source_type }}">{{ post.source_type }}</span></td>
+      <td>{{ post.source_value }}</td>
+      <td>
+        <a href="{{ post.post_url }}" target="_blank" class="post-link">
+          {{ post.title[:70] }}{% if post.title|length > 70 %}...{% endif %}
+        </a>
+      </td>
+      <td>{{ post.author }}</td>
+      <td>{{ post.post_date }}</td>
+      <td>{{ '✅' if post.synced_to_sheets else '⏳' }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+<div class="pagination">
+  {% if page > 1 %}
+  <a href="/posts?page={{ page - 1 }}&q={{ q }}" class="btn btn-secondary">이전</a>
+  {% endif %}
+  <span>{{ page }} / {{ total_pages }} 페이지</span>
+  {% if page < total_pages %}
+  <a href="/posts?page={{ page + 1 }}&q={{ q }}" class="btn btn-secondary">다음</a>
+  {% endif %}
+</div>
+{% else %}
+<p class="empty-state">
+  {% if q %}검색 결과가 없습니다.{% else %}수집된 데이터가 없습니다.{% endif %}
+</p>
+{% endif %}
+
+{% endblock %}

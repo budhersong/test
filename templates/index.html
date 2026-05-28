@@ -1,0 +1,100 @@
+{% extends "base.html" %}
+{% block title %}대시보드 - 네이버 블로그 크롤러{% endblock %}
+{% block content %}
+
+<div class="page-header">
+  <h1>대시보드</h1>
+  <form method="post" action="/crawl/run">
+    <button type="submit" class="btn btn-primary">지금 크롤링 실행</button>
+  </form>
+</div>
+
+{% if request.query_params.get('msg') %}
+<div class="alert alert-info">{{ request.query_params.get('msg') }}</div>
+{% endif %}
+
+<div class="stats-grid">
+  <div class="stat-card">
+    <div class="stat-value">{{ keyword_count }}</div>
+    <div class="stat-label">활성 키워드/채널</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-value">{{ post_count }}</div>
+    <div class="stat-label">총 수집 포스트</div>
+  </div>
+  <div class="stat-card" id="crawl-status-card">
+    <div class="stat-value" id="last-crawl-status">확인 중...</div>
+    <div class="stat-label">최근 크롤링 상태</div>
+  </div>
+  {% if spreadsheet_url %}
+  <div class="stat-card">
+    <a href="{{ spreadsheet_url }}" target="_blank" class="sheets-link">
+      <div class="stat-value">📊</div>
+      <div class="stat-label">Google Sheets 열기</div>
+    </a>
+  </div>
+  {% endif %}
+</div>
+
+<section class="section">
+  <h2>크롤링 이력</h2>
+  {% if logs %}
+  <table class="table">
+    <thead>
+      <tr>
+        <th>시작 시각</th>
+        <th>완료 시각</th>
+        <th>상태</th>
+        <th>신규 수집</th>
+        <th>오류</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for log in logs %}
+      <tr>
+        <td>{{ log.started_at.strftime('%Y-%m-%d %H:%M') if log.started_at else '-' }}</td>
+        <td>{{ log.finished_at.strftime('%Y-%m-%d %H:%M') if log.finished_at else '-' }}</td>
+        <td><span class="badge badge-{{ log.status }}">{{ log.status }}</span></td>
+        <td>{{ log.new_posts }}건</td>
+        <td class="error-msg">{{ log.error_message or '' }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="empty-state">크롤링 이력이 없습니다. 키워드를 추가하고 크롤링을 실행해보세요.</p>
+  {% endif %}
+</section>
+
+<section class="section">
+  <h2>최근 수집 포스트</h2>
+  {% if recent_posts %}
+  <table class="table">
+    <thead>
+      <tr>
+        <th>수집일시</th>
+        <th>유형</th>
+        <th>키워드/채널</th>
+        <th>제목</th>
+        <th>작성자</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for post in recent_posts %}
+      <tr>
+        <td>{{ post.crawled_at.strftime('%Y-%m-%d %H:%M') }}</td>
+        <td><span class="badge badge-{{ post.source_type }}">{{ post.source_type }}</span></td>
+        <td>{{ post.source_value }}</td>
+        <td><a href="{{ post.post_url }}" target="_blank" class="post-link">{{ post.title[:60] }}{% if post.title|length > 60 %}...{% endif %}</a></td>
+        <td>{{ post.author }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  <a href="/posts" class="btn btn-secondary">전체 보기</a>
+  {% else %}
+  <p class="empty-state">수집된 포스트가 없습니다.</p>
+  {% endif %}
+</section>
+
+{% endblock %}

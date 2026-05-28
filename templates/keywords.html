@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+{% block title %}키워드/채널 관리 - 네이버 블로그 크롤러{% endblock %}
+{% block content %}
+
+<div class="page-header">
+  <h1>키워드 / 채널 관리</h1>
+</div>
+
+<section class="section">
+  <h2>새 항목 추가</h2>
+  <form method="post" action="/keywords/add" class="add-form">
+    <div class="form-row">
+      <select name="type" class="form-select">
+        <option value="keyword">키워드 검색</option>
+        <option value="channel">블로그 채널 ID</option>
+      </select>
+      <input
+        type="text"
+        name="value"
+        class="form-input"
+        placeholder="예) 맛집 리뷰  또는  blog_id (채널 선택 시)"
+        required
+      >
+      <button type="submit" class="btn btn-primary">추가</button>
+    </div>
+    <p class="form-hint">
+      키워드: 네이버 블로그 검색 키워드 (예: 강남 맛집 후기)<br>
+      채널 ID: 네이버 블로그 URL의 아이디 (예: blog.naver.com/<strong>abc123</strong>)
+    </p>
+  </form>
+</section>
+
+<section class="section">
+  <h2>등록된 항목 ({{ keywords|length }}개)</h2>
+  {% if keywords %}
+  <table class="table">
+    <thead>
+      <tr>
+        <th>유형</th>
+        <th>값</th>
+        <th>상태</th>
+        <th>등록일</th>
+        <th>액션</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for kw in keywords %}
+      <tr class="{{ 'inactive' if not kw.active else '' }}">
+        <td><span class="badge badge-{{ kw.type }}">{{ '키워드' if kw.type == 'keyword' else '채널' }}</span></td>
+        <td>{{ kw.value }}</td>
+        <td>
+          <span class="badge badge-{{ 'success' if kw.active else 'inactive' }}">
+            {{ '활성' if kw.active else '비활성' }}
+          </span>
+        </td>
+        <td>{{ kw.created_at.strftime('%Y-%m-%d') }}</td>
+        <td class="actions">
+          <form method="post" action="/keywords/{{ kw.id }}/toggle" style="display:inline">
+            <button type="submit" class="btn btn-sm btn-secondary">
+              {{ '비활성화' if kw.active else '활성화' }}
+            </button>
+          </form>
+          <form method="post" action="/keywords/{{ kw.id }}/delete" style="display:inline"
+                onsubmit="return confirm('삭제하시겠습니까?')">
+            <button type="submit" class="btn btn-sm btn-danger">삭제</button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="empty-state">등록된 키워드/채널이 없습니다. 위에서 추가해보세요.</p>
+  {% endif %}
+</section>
+
+{% endblock %}

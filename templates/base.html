@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}네이버 블로그 크롤러{% endblock %}</title>
+  <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+  <nav class="navbar">
+    <div class="nav-brand">📊 블로그 리뷰 크롤러</div>
+    <div class="nav-links">
+      <a href="/">대시보드</a>
+      <a href="/keywords">키워드/채널</a>
+      <a href="/posts">수집 데이터</a>
+    </div>
+  </nav>
+  <main class="container">
+    {% block content %}{% endblock %}
+  </main>
+  <script src="/static/js/app.js"></script>
+</body>
+</html>
